@@ -2,9 +2,11 @@
 
 ### Example usage
 
+#### beforeRequest Hooks
+
 ```js
 const axios = require("axios");
-// GET request for remote image in node.js
+
 axios({
   method: "get",
   url: "http://localhost:3000/threats",
@@ -38,6 +40,32 @@ axios({
         next();
       },
     ],
+    // this is the error handler that handles any error passed to the next function
+    errorHandler: (err) => {
+      console.error("this is the error =>", err);
+    },
+  },
+})
+  .then(function (response) {
+    // response.data.pipe(fs.createWriteStream("ada_lovelace.jpg"));
+    console.log("fn() => ", response.data);
+  })
+  .catch((err) => {
+    console.log("====", err);
+  });
+```
+
+#### afterResponse Hooks
+
+```js
+const axios = require("axios");
+
+axios({
+  method: "get",
+  url: "http://localhost:3000/threats",
+  token: "JWT irierijeriheirheirhierh",
+  // Hooks
+  hooks: {
     // the afterResponse hook is executed after the network call is made
     afterResponse: [
       /**
@@ -65,6 +93,32 @@ axios({
         next();
       },
     ],
+    // this is the error handler that handles any error passed to the next function
+    errorHandler: (err) => {
+      console.error("this is the error =>", err);
+    },
+  },
+})
+  .then(function (response) {
+    // response.data.pipe(fs.createWriteStream("ada_lovelace.jpg"));
+    console.log("fn() => ", response.data);
+  })
+  .catch((err) => {
+    console.log("====", err);
+  });
+```
+
+#### beforeError Hooks
+
+```js
+const axios = require("axios");
+
+axios({
+  method: "get",
+  url: "http://localhost:3000/threats",
+  token: "JWT irierijeriheirheirhierh",
+  // Hooks
+  hooks: {
     // the beforeError hook is executed after an error
     beforeError: [
       /**
