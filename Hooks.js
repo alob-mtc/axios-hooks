@@ -70,9 +70,6 @@ Hooks.prototype.hook = function hook(name, fn, err) {
   pres[name] = pres[name] || [];
   posts[name] = posts[name] || [];
 
-  // this is called by the last post hook
-  function noop() {}
-
   /**
    * TODO: add better documentation for the function
    */
@@ -82,45 +79,64 @@ Hooks.prototype.hook = function hook(name, fn, err) {
     pres = this._pres[name];
     posts = this._posts[name];
     var hookArgs = [].slice.call(arguments);
+    // this is called by the last post hook
+    function noop() {
+      // TODO: do some validation befor reasigning it to the result
+      if (arguments[0] instanceof Error) return err(arguments[0]);
+      if (arguments.length) hookArgs = [].slice.call(arguments);
+      if (hookArgs[0] instanceof Promise) {
+        result = hookArgs[0];
+      } else {
+        result = new Promise(function createReturnValue(res) {
+          res(hookArgs[0]);
+        });
+      }
+    }
     function allPresDone() {
       if (arguments[0] instanceof Error) return err(arguments[0]);
       hookArgs = [config];
       result = fn.apply(self, hookArgs);
-      // TODO: check if there is an error => run any before-error hook that is registered
-      //* shedule the post hooks to run in the next tick soo this does not block the return of fn call to the root function [name]
-      process.nextTick(function shedulePosthooks() {
-        result
-          .then(function something(value) {
-            hookArgs = [value, fn.bind(self, config)];
-            var postChain = posts.map(function createPostHookWrapper(post, i) {
-              function wrapper() {
-                if (arguments[0] instanceof Error) return err(arguments[0]);
-                if (arguments.length) hookArgs = [].slice.call(arguments);
-                post.apply(self, [postChain[i + 1] || noop].concat(hookArgs));
-              } // end wrapper = function () {...
-              return wrapper;
-            }); // end posts.map(...)noop
-            // TODO: check if and error to fn call
-            if (postChain.length) postChain[0]();
-          })
-          .catch(function errorHandler() {
-            // ? if an error occurs => do i run the post hook
-          });
-      });
-      return null;
+      return result
+        .then(function handlePostHooks(value) {
+          hookArgs = [value, fn.bind(self, config)];
+          var postChain = posts.map(function createPostHookWrapper(post, i) {
+            function wrapper() {
+              if (arguments[0] instanceof Error) return err(arguments[0]);
+              if (arguments.length) hookArgs = [].slice.call(arguments);
+              return post.apply(
+                self,
+                [postChain[i + 1] || noop].concat(hookArgs)
+              );
+            } // end wrapper = function () {...
+            return wrapper;
+          }); // end posts.map(...)noop
+          if (postChain.length) {
+            postChain[0]();
+          }
+          // TODO: return a promise
+          // return the result promise
+          return result;
+        })
+        .catch(function errorHandler() {
+          // TODO: check if there is an error => run any before-error hook that is registered
+          // TODO: add the befor error hook
+          return new Promise(function newPromise() {});
+        });
     }
     var preChain = pres.map(function createPreHookWrapper(pre, i) {
       function wrapper() {
         if (arguments[0] instanceof Error) return err(arguments[0]);
 
         if (arguments.length) hookArgs = [].slice.call(arguments);
-        pre.apply(self, [preChain[i + 1] || allPresDone].concat(hookArgs));
+        return pre.apply(
+          self,
+          [preChain[i + 1] || allPresDone].concat(hookArgs)
+        );
       } // end wrapper = function () {...
       return wrapper;
     }); // end posts.map(...)
 
-    (preChain[0] || allPresDone)();
-    return result;
+    return (preChain[0] || allPresDone)();
   };
 };
 
