@@ -29,6 +29,12 @@ Hooks.prototype.register = function register(hooks, fn) {
         curremtSelf.pre(fn.name, pre, null);
       });
     }
+    if (hooks.beforeError && hooks.beforeError.length > 0) {
+      hasHook = true;
+      hooks.beforeError.map(function registerBeforeErrorHooks(post) {
+        curremtSelf.beforeError(fn.name, post, null);
+      });
+    }
     if (hooks.afterResponse && hooks.afterResponse.length > 0) {
       hasHook = true;
       // register the post hook
@@ -67,8 +73,11 @@ Hooks.prototype.hook = function hook(name, fn, err) {
   var currentSelf = this;
   var pres = (currentSelf._pres = currentSelf._pres || {});
   var posts = (currentSelf._posts = currentSelf._posts || {});
+  var beforeErrors = (currentSelf._beforeErrors =
+    currentSelf._beforeErrors || {});
   pres[name] = pres[name] || [];
   posts[name] = posts[name] || [];
+  beforeErrors[name] = beforeErrors[name] || [];
 
   /**
    * TODO: add better documentation for the function
@@ -76,10 +85,11 @@ Hooks.prototype.hook = function hook(name, fn, err) {
   currentSelf[name] = function mainFunction(config) {
     var result = new Promise(function defaultReturnValue() {});
     var self = this;
-    pres = this._pres[name];
-    posts = this._posts[name];
+    pres = self._pres[name];
+    posts = self._posts[name];
+    beforeErrors = self._beforeErrors[name];
     var hookArgs = [].slice.call(arguments);
-    // this is called by the last post hook
+    // this is called by the last post hook => what ever value was passed over by the last post hook is set as the result value
     function noop() {
       // TODO: do some validation befor reasigning it to the result
       if (arguments[0] instanceof Error) return err(arguments[0]);
@@ -98,7 +108,12 @@ Hooks.prototype.hook = function hook(name, fn, err) {
       result = fn.apply(self, hookArgs);
       return result
         .then(function handlePostHooks(value) {
-          hookArgs = [value, fn.bind(self, config)];
+          hookArgs = [
+            value,
+            function retry(updatedOptions) {
+              return fn(Object.assign(config, updatedOptions));
+            }
+          ];
           var postChain = posts.map(function createPostHookWrapper(post, i) {
             function wrapper() {
               if (arguments[0] instanceof Error) return err(arguments[0]);
@@ -117,10 +132,30 @@ Hooks.prototype.hook = function hook(name, fn, err) {
           // return the result promise
           return result;
         })
-        .catch(function errorHandler() {
+        .catch(function errorHandler(error) {
           // TODO: check if there is an error => run any before-error hook that is registered
           // TODO: add the befor error hook
-          return new Promise(function newPromise() {});
+          var beforeErrorChain = beforeErrors.map(
+            function createBeforeErrorHookWrapper(post, i) {
+              function wrapper() {
+                if (arguments[0] instanceof Error) error = arguments[0];
+                post.apply(
+                  self,
+                  [
+                    beforeErrorChain[i + 1] ||
+                      function doNothing() {
+                        if (arguments[0] instanceof Error) error = arguments[0];
+                      }
+                  ].concat(error)
+                );
+              }
+              return wrapper;
+            }
+          );
+          beforeErrorChain[0]();
+          return new Promise(function newPromise(_, rej) {
+            rej(error);
+          });
         });
     }
     var preChain = pres.map(function createPreHookWrapper(pre, i) {
@@ -157,11 +192,23 @@ Hooks.prototype.pre = function pre(name, fn) {
  * @param {*} name
  * @param {*} fn
  */
-Hooks.prototype.post = function pre(name, fn) {
+Hooks.prototype.post = function post(name, fn) {
   var currentSelf = this;
   var posts = (currentSelf._posts = currentSelf._posts || {});
   (posts[name] = posts[name] || []).push(fn);
   return this;
+};
+
+/**
+ *  this
+ * @param {*} name
+ * @param {*} fn
+ */
+Hooks.prototype.beforeError = function beforeError(name, fn) {
+  var currentSelf = this;
+  var beforeErrors = (currentSelf._beforeErrors =
+    currentSelf._beforeErrors || {});
+  (beforeErrors[name] = beforeErrors[name] || []).push(fn);
 };
 
 var AxiosHooks = new Hooks();
