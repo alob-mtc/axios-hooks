@@ -84,6 +84,7 @@ Hooks.prototype.hook = function hook(name, fn, err) {
    */
   currentSelf[name] = function mainFunction(config) {
     var result = new Promise(function defaultReturnValue() {});
+    var finishValue = null; // this is the value returned at the end this funtion call
     var self = this;
     pres = self._pres[name];
     posts = self._posts[name];
@@ -94,34 +95,35 @@ Hooks.prototype.hook = function hook(name, fn, err) {
       // TODO: do some validation befor reasigning it to the result
       if (arguments[0] instanceof Error) return err(arguments[0]);
       if (arguments.length) hookArgs = [].slice.call(arguments);
-      if (hookArgs[0] instanceof Promise) {
-        result = hookArgs[0];
-      } else {
-        result = new Promise(function createReturnValue(res) {
-          res(hookArgs[0]);
-        });
+      if (hookArgs.length) {
+        if (hookArgs[0] instanceof Promise) {
+          result = hookArgs[0];
+        } else {
+          result = new Promise(function createReturnValue(res) {
+            res(hookArgs[0]);
+          });
+        }
       }
     }
     function allPresDone() {
       if (arguments[0] instanceof Error) return err(arguments[0]);
       hookArgs = [config];
       result = fn.apply(self, hookArgs);
-      return result
+      // asign the result promise to the finishValue
+      finishValue = result
         .then(function handlePostHooks(value) {
           hookArgs = [
             value,
-            function retry(updatedOptions) {
-              return fn(Object.assign(config, updatedOptions));
+            function retryWithMergedOptions(updatedOptions) {
+              // overwrite the hookArgs with the new fn return value
+              hookArgs[0] = fn(Object.assign(config, updatedOptions));
             }
           ];
           var postChain = posts.map(function createPostHookWrapper(post, i) {
             function wrapper() {
               if (arguments[0] instanceof Error) return err(arguments[0]);
               if (arguments.length) hookArgs = [].slice.call(arguments);
-              return post.apply(
-                self,
-                [postChain[i + 1] || noop].concat(hookArgs)
-              );
+              post.apply(self, [postChain[i + 1] || noop].concat(hookArgs));
             } // end wrapper = function () {...
             return wrapper;
           }); // end posts.map(...)noop
@@ -171,7 +173,8 @@ Hooks.prototype.hook = function hook(name, fn, err) {
       return wrapper;
     }); // end posts.map(...)
 
-    return (preChain[0] || allPresDone)();
+    (preChain[0] || allPresDone)();
+    return finishValue;
   };
 };
 
