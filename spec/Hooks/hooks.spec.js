@@ -1,8 +1,5 @@
 var Hooks = require("../../lib/Hooks");
 
-// TODO add in test for making sure all pres get called if pre is defined directly on an instance.
-// TODO Test for calling `done` twice or `next` twice in the same function counts only once
-
 describe("hooks", function () {
   function returnPromise(check, value) {
     return new Promise(function (resolve, reject) {
