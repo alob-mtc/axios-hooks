@@ -29,7 +29,7 @@ axios({
         options.headers = {};
         options.headers["Authorization"] = options.token;
         console.log("pre1");
-        next({msg: 'message from pre1});
+        next({msg: 'message from pre1'});
       },
       function (next, arg) {  //value is the value passed from the previous pre hook
         console.log("pre2");
