@@ -10,7 +10,7 @@ describe("hooks", function () {
       }
     });
   }
-  // var instance = axios.create();
+
   it("should be able to assign hooks", function () {
     var a = new Hooks();
     a.hook("hook1", function (a) {});
