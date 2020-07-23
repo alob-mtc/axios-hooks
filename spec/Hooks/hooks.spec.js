@@ -1,4 +1,5 @@
-var Hooks = require("../../lib/Hooks");
+var Hooks = require('../../../lib/core/hooks');
+var axios = require('../../../index');
 
 describe('hooks', function() {
   function returnPromise(check, value) {
@@ -385,7 +386,7 @@ describe('hooks', function() {
     expect(a.rock).toEqual('says');
   });
 
-  it('calling the same next multiple times should have the effect of only calling it once', function(done) {
+  it('calling the hook next multiple times should have the effect of only calling it once', function(done) {
     var a = new Hooks();
     var counter = 0;
     a.hook('ack', function() {
@@ -572,6 +573,28 @@ describe('hooks', function() {
     var registered = a.register(hook, function save() {});
     expect(registered).toEqual(true);
     a.save();
+    expect(errorMsg).toEqual('error2');
+  });
+  // testing axios end-to-end
+  it('should register hook if present in the axios request config', function() {
+    var errorMsg;
+    var hooks = {
+      beforeRequest: [
+        function(next) {
+          next(new Error('error1'));
+        }
+      ],
+      beforeError: [],
+      afterResponse: []
+    };
+    hooks.errorHandler = function(err) {
+      expect(err.message).toEqual('error1');
+      errorMsg = 'error2';
+    };
+    axios({
+      url: '/foo',
+      hooks: hooks
+    });
     expect(errorMsg).toEqual('error2');
   });
 });
