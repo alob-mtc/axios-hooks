@@ -13,6 +13,6 @@
     "jasmine": "^3.5.0",
     "mocha": "^8.0.1",
     "nyc": "^15.1.0",
-    "underscore": "^1.10.2"
+    "underscore": "^1.12.1"
   }
 }
